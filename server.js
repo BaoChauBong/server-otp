@@ -78,8 +78,14 @@ app.get("/api/otp", (req, res) => {
   });
 });
 
+// app.get("/view", (req, res) => {
+//   res.sendFile(__dirname + "/index.html");
+// });
 app.get("/view", (req, res) => {
-  res.sendFile(__dirname + "/index.html");
+  res.json({
+    success: true,
+    data: otpList
+  });
 });
 
 // ===== SOCKET =====
