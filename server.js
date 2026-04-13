@@ -78,6 +78,10 @@ app.get("/api/otp", (req, res) => {
   });
 });
 
+app.get("/view", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
+
 // ===== SOCKET =====
 io.on("connection", (socket) => {
   console.log("🔌 Client connected:", socket.id);
@@ -88,6 +92,7 @@ io.on("connection", (socket) => {
     console.log("❌ Client disconnected:", socket.id);
   });
 });
+
 
 // ===== START SERVER (IMPORTANT FOR RENDER) =====
 const PORT = process.env.PORT || 3000;

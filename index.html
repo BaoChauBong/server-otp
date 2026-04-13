@@ -1,87 +1,62 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>OTP Dashboard</title>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-
-  <style>
-    body {
-      font-family: Arial;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-
-    h2 {
-      margin-bottom: 20px;
-    }
-
-    .otp-box {
-      background: white;
-      padding: 15px;
-      margin-bottom: 10px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      cursor: pointer;
-    }
-
-    .otp {
-      font-size: 28px;
-      font-weight: bold;
-      color: green;
-    }
-
-    .meta {
-      font-size: 12px;
-      color: gray;
-    }
-  </style>
+  <title>OTP Realtime</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 
-<body>
-  <h2>📲 OTP Dashboard (Click để copy)</h2>
+<body style="font-family: sans-serif; padding: 20px;">
 
-  <div id="list"></div>
+  <h2>OTP mới nhất</h2>
+  <h1 id="otp" style="color: green;">---</h1>
 
+  <h3>Danh sách OTP</h3>
+  <ul id="list"></ul>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script>
-    const API = "http://10.111.201.183:3000";
-    const socket = io(API);
+    const socket = io("https://server-otp-ulbl.onrender.com");
 
-    socket.on("new-otp", (data) => {
-      render(data, true);
+    const otpEl = document.getElementById("otp");
+    const listEl = document.getElementById("list");
+
+    // load dữ liệu ban đầu
+    socket.on("init-otp", (data) => {
+      listEl.innerHTML = "";
+
+      data.forEach(item => {
+        const li = document.createElement("li");
+        li.innerText = item.otp + " - " + item.time;
+        listEl.appendChild(li);
+      });
+
+      if (data.length > 0) {
+        otpEl.innerText = data[0].otp;
+      }
     });
 
-    async function loadInit() {
-      const res = await fetch(API + "/api/otp");
-      const data = await res.json();
-      data.forEach(item => render(item, false));
-    }
+    // khi có OTP mới
+    socket.on("new-otp", (data) => {
+      // update OTP lớn
+      otpEl.innerText = data.otp;
 
-    function render(item, isNew) {
-      const div = document.createElement("div");
-      div.className = "otp-box";
+      // thêm vào list
+      const li = document.createElement("li");
+      li.innerText = data.otp + " - " + data.time;
+      li.style.color = "red"; // highlight OTP mới
+      listEl.prepend(li);
 
-      div.innerHTML = `
-        <div class="otp">${item.otp || "----"}</div>
-        <div>${item.message || ""}</div>
-        <div class="meta">
-          🏦 ${item.sender} | 🌍 ${item.env} | ⏱ ${new Date(item.time).toLocaleTimeString()}
-        </div>
-      `;
+      // auto copy OTP
+      navigator.clipboard.writeText(data.otp);
 
-      // click để copy
-      div.onclick = () => {
-        navigator.clipboard.writeText(item.otp || "");
-        alert("✅ Đã copy OTP: " + item.otp);
-      };
-
-      if (isNew) {
-        document.getElementById("list").prepend(div);
-      } else {
-        document.getElementById("list").appendChild(div);
+      // rung nhẹ (mobile)
+      if (navigator.vibrate) {
+        navigator.vibrate(200);
       }
-    }
-
-    loadInit();
+    });
   </script>
+
 </body>
+
 </html>
