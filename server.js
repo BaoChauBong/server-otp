@@ -1,47 +1,63 @@
 // ===== IMPORT =====
 const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
 const cors = require("cors");
 
 // ===== INIT =====
 const app = express();
-const server = http.createServer(app);
-
-// Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
-
-// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json());
 
 // ===== MEMORY STORE =====
 let otpList = [];
 
-// ===== ROOT CHECK =====
+// ===== ROOT =====
 app.get("/", (req, res) => {
   res.json({
     status: "OK",
-    message: "OTP server is running 🚀"
+    message: "OTP API running 🚀"
   });
 });
 
-// ===== EXTRACT OTP =====
-function extractOTP(text = "") {
-  const match = text.match(/\d{6}/);
-  return match ? match[0] : "";
+// ===== PARSE MESSAGE =====
+function parseMessage(text = "") {
+  // PASSWORD
+  let match = text.match(/(?:MK|mat khau|password)[^0-9]*(\d{6,12})/i);
+  if (match) {
+    return {
+      type: "PASSWORD",
+      value: match[1]
+    };
+  }
+
+  // OTP keyword
+  match = text.match(/otp[^0-9]*(\d{4,8})/i);
+  if (match) {
+    return {
+      type: "OTP",
+      value: match[1]
+    };
+  }
+
+  // fallback OTP 6 số
+  match = text.match(/\b\d{6}\b/);
+  if (match) {
+    return {
+      type: "OTP",
+      value: match[0]
+    };
+  }
+
+  // ALERT
+  return {
+    type: "ALERT",
+    value: ""
+  };
 }
 
-// ===== RECEIVE OTP =====
+// ===== RECEIVE MESSAGE =====
 app.post("/api/otp", (req, res) => {
-  console.log("📩 Incoming OTP:", req.body);
+  console.log("📩 Incoming:", req.body);
 
-  // lấy message linh hoạt
   const message =
     req.body.message ||
     req.body.sms ||
@@ -49,28 +65,25 @@ app.post("/api/otp", (req, res) => {
     req.body.body ||
     JSON.stringify(req.body);
 
-  const otp = extractOTP(message);
+  const parsed = parseMessage(message);
 
-  const newOTP = {
-    otp,
+  const newItem = {
+    type: parsed.type,
+    value: parsed.value,
     message,
     sender: req.body.sender || "UNKNOWN",
     time: new Date().toISOString()
   };
 
-  // lưu newest lên đầu
-  otpList.unshift(newOTP);
-
-  // broadcast realtime
-  io.emit("new-otp", newOTP);
+  otpList.unshift(newItem);
 
   res.json({
     success: true,
-    otp
+    data: newItem
   });
 });
 
-// ===== GET OTP LIST =====
+// ===== GET ALL =====
 app.get("/api/otp", (req, res) => {
   res.json({
     success: true,
@@ -78,25 +91,29 @@ app.get("/api/otp", (req, res) => {
   });
 });
 
-app.get("/view", (req, res) => {
-  res.sendFile(__dirname + "/index.html");
-});
+// ===== FILTER BY TYPE =====
+app.get("/api/otp/type/:type", (req, res) => {
+  const type = req.params.type.toUpperCase();
 
-// ===== SOCKET =====
-io.on("connection", (socket) => {
-  console.log("🔌 Client connected:", socket.id);
+  const result = otpList.filter(item => item.type === type);
 
-  socket.emit("init-otp", otpList);
-
-  socket.on("disconnect", () => {
-    console.log("❌ Client disconnected:", socket.id);
+  res.json({
+    success: true,
+    data: result
   });
 });
 
+// ===== LẤY OTP MỚI NHẤT =====
+app.get("/api/latest", (req, res) => {
+  res.json({
+    success: true,
+    data: otpList[0] || null
+  });
+});
 
-// ===== START SERVER (IMPORTANT FOR RENDER) =====
+// ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log("🚀 Server running on port:", PORT);
 });
